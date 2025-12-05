@@ -21,7 +21,7 @@ import csv
 import sys
 sys.path.append('../src')
 
-from parsing import Dataset, item_section, node_coord_section
+from importData import FileData, createItemFromData, createCityFromData
 from ttp2 import MakeDistanceMatrix
 
 from crossover import crossover_tsp, crossover_kp_but_make_it_indian
@@ -43,23 +43,23 @@ data_name = "../data/a280-n279.txt"
 #######
 
 # read data
-dataset = Dataset.new(open(data_name, 'r').read())
-print(dataset.name)
+dataset = FileData(data_name)
+print(dataset.fileName)
 
 # basic info from data
 number_of_cities = dataset.dimension
-vmin = dataset.min_speed
-vmax = dataset.max_speed
-Q = dataset.knapsack_capacity
-R = dataset.renting_ratio
-city_indices = [dataset.nodes[i].index for i in range(number_of_cities)]
+vmin = dataset.minSpeed
+vmax = dataset.maxSpeed
+Q = dataset.knapsackCapacity
+R = dataset.rentingRatio
+city_indices = [dataset.cities[i].index for i in range(number_of_cities)]
 
 # sections (from data)
-item_section = item_section(dataset)
-node_coord_section = node_coord_section(dataset)
+itemData = createItemFromData(dataset)
+cityData = createCityFromData(dataset)
 
 # construct a distance matrix
-distance_matrix = MakeDistanceMatrix(node_coord_section)
+distance_matrix = MakeDistanceMatrix(cityData)
 
 # generate solutions - initialise array for costs
 fake_costs = np.zeros((N + 2, 2))  # initialise an array for parents and children
@@ -95,13 +95,13 @@ fake_costs = np.zeros((N + 2, 2))  # initialise an array for parents and childre
 #     print("ok we're not reading anything")
 
 iterations = iterations_total
-population = [generateRandomSolution(Q, number_of_cities, city_indices, item_section) for i in range(N)]
+population = [generateRandomSolution(Q, number_of_cities, city_indices, itemData) for i in range(N)]
 
 
 assert len(population) == N, f"Wait, but the number of parents ({len(population)}) is different to the population size ({N})."
 
 # evaluate all parents
-fake_costs[:N] = [calcTimeAndProfit(c, item_section, i, distance_matrix, Q, vmax, vmin, R) for c, i in population]
+fake_costs[:N] = [calcTimeAndProfit(c, itemData, i, distance_matrix, Q, vmax, vmin, R) for c, i in population]
 # to the evaluations, append front ranks and crowding distance
 fake_costs_extended, _ = calc_rank_and_crowding_distance(fake_costs[:N])#, plot=True) # costs are basically costs but updated
 
@@ -123,15 +123,15 @@ for i in trange(iterations):
 
     # crossover
     child_tour_1, child_tour_2 = crossover_tsp(win_tour_1, win_tour_2)
-    child_packing_1, child_packing_2 = crossover_kp_but_make_it_indian(win_packing_1, win_packing_2,  item_section, Q)
+    child_packing_1, child_packing_2 = crossover_kp_but_make_it_indian(win_packing_1, win_packing_2,  itemData, Q)
 
     # mutation
     child_tour_1, child_tour_2 = tsp_mutation(child_tour_1, child_tour_2)
-    child_packing_1, child_packing_2 = kp_mutation(item_section, child_packing_1, child_packing_2, Q)
+    child_packing_1, child_packing_2 = kp_mutation(itemData, child_packing_1, child_packing_2, Q)
 
     # evaluate the children
     fake_children = [(child_tour_1, child_packing_1), (child_tour_2, child_packing_2)]
-    fake_costs[N:] = [calcTimeAndProfit(c, item_section, i, distance_matrix, Q, vmax, vmin, R) for c, i in fake_children]
+    fake_costs[N:] = [calcTimeAndProfit(c, itemData, i, distance_matrix, Q, vmax, vmin, R) for c, i in fake_children]
 
     ## perform nsga-ii selection and replacement
 
@@ -164,7 +164,7 @@ for i in trange(iterations):
     # evaluate it
 
     # fake_costs = np.zeros((N + 2, 2))  # we could wipe the costs but it might be a waste of time
-    fake_costs[:N] = [calcTimeAndProfit(c, item_section, i, distance_matrix, Q, vmax, vmin, R) for
+    fake_costs[:N] = [calcTimeAndProfit(c, itemData, i, distance_matrix, Q, vmax, vmin, R) for
                       c, i in population]
     # to the evaluations, append front ranks and crowding distance
     fake_costs_extended, _ = calc_rank_and_crowding_distance(fake_costs[:N])#, plot=True)
